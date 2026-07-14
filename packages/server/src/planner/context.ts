@@ -150,6 +150,34 @@ export const ANCHOR_SNAP: SnapFilter = {
   radiusM: 25,
 };
 
+/**
+ * Snappfiltret för UPPTÄCKTSLÄGETS mål. Samma vägklasser, helt annan radie.
+ *
+ * ⚠️ Utsvepet använde `ANCHOR_SNAP` först, och det var en kategorimiss som gav NOLL ben
+ *    söderut från Växjö, varje gång:
+ *
+ *      ett ankare  är en punkt PÅ en väg vi hämtat ur vägindexet. Snappar den mer än 25 m
+ *                  bort har den snappat till en ANNAN väg, och då är den värdelös — hela
+ *                  poängen var att tvinga rutten genom just den vägbiten.
+ *
+ *      ett mål     är en punkt vi HITTAT PÅ: sju kilometer söderut, mitt i skogen. Att
+ *                  närmaste väg ligger sjuttio meter bort är inte ett fel, det är det
+ *                  normala. Punkten betyder "någonstans ditåt", inte "exakt här".
+ *
+ *    Med ankarradien avvisade adaptern alla femton kastade mål — Valhalla hade snappat dem
+ *    utmärkt — och användaren fick "vi hittade ingen tur åt dig" när det i själva verket
+ *    fanns gott om väg.
+ *
+ * 800 m är ungefär halva avståndet mellan två småvägar på småländsk landsbygd. Längre än så
+ * och målet har slutat peka åt det håll användaren bad om.
+ */
+export const TARGET_SNAP: SnapFilter = {
+  maxRoadClass: 'tertiary',
+  minRoadClass: 'residential',
+  minReachability: 50,
+  radiusM: 800,
+};
+
 // ─── Talen ──────────────────────────────────────────────────────────────────
 
 /** Ankarsegment ur ellipsen, efter spridning. Matrisen gallrar dem sedan till fan-outen. */

@@ -76,7 +76,7 @@ export function anchorBeauty(s: RoadSegment): number {
  *    säger den ingenting alls. Vi låter den betyda det den menade: wayens längd, alltså hur
  *    mycket sammanhängande okänd väg som faktiskt ligger här.
  */
-const MIN_ANCHOR_WAY_M = 1_000;
+export const MIN_ANCHOR_WAY_M = 1_000;
 
 /**
  * Rangordna segmenten i ellipsen (design-v1 §3, steg 3):

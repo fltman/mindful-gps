@@ -29,7 +29,7 @@ import type {
 } from '@mindful/core';
 
 import { midpointOf } from '../roadindex/segmenter.js';
-import { anchorBeauty } from './anchors.js';
+import { MIN_ANCHOR_WAY_M, anchorBeauty } from './anchors.js';
 import { candidateOf, dedupe } from './candidates.js';
 import type { Scoring } from './candidates.js';
 import { ANCHOR_CLASSES, ANCHOR_SNAP, TOP_N, settle } from './context.js';
@@ -71,12 +71,34 @@ const MIN_CANDIDATES = 2;
 const SECTORS = 12;
 const SECTOR_DEG = 360 / SECTORS;
 
-/** Ankarparets bäringar ska ligga så här långt isär — annars blir slingan en tur och retur. */
-const PAIR_MIN_DEG = 90;
-const PAIR_MAX_DEG = 150;
+/**
+ * Ankarparets bäringar ska ligga så här långt isär — annars blir slingan en tur och retur.
+ *
+ * ⚠️ Fönstret var 90–150° och det gjorde kandidaterna dyrbara: på den stora ringen (en
+ *    tretimmarsslinga) fanns bara FEM par som klarade både vinkeln och tvärförbindelsen,
+ *    och när `isNatural` sedan kastade alla fem stod användaren utan slinga.
+ *
+ *    75–165° är fortfarande långt ifrån en tur och retur (som är 0°) och långt ifrån en
+ *    rak genomfart (180°, där tvärförbindelsen ändå går genom hemmet och stoppas av
+ *    SHORTCUT_MAX). Vi köper fler kandidater utan att slappna av på det som betyder något:
+ *    självöverlappet, som fortfarande måste under 5 %.
+ */
+const PAIR_MIN_DEG = 75;
+const PAIR_MAX_DEG = 165;
 
-/** Så många ankarpar ruttar vi. Ett route-anrop per par. */
-const PAIRS = 4;
+/**
+ * Så många ankarpar ruttar vi. Ett route-anrop per par.
+ *
+ * ⚠️ Var 4, och gav i praktiken TRE — sektorspridningen tog slut. `isNatural` är ett HÅRT
+ *    filter (och ska vara det: en slinga med 29 % självöverlapp ÄR en tur och retur), så
+ *    med tre kandidater blev svaret regelbundet noll.
+ *
+ *    Lösningen är inte att sänka ribban utan att kasta fler bollar på den. Sexton anrop mot
+ *    vår egen Valhalla kostar ingenting — inga kvoter, inga rate limits, det är hela
+ *    poängen med att hosta den själv — och de tar planeringen från "vi hittade ingen tur åt
+ *    dig" till ett svar.
+ */
+const PAIRS = 16;
 
 /**
  * Slingans hårda tidsgräns. Slingan HAR ingen ε — användaren gav en budget i minuter, och
@@ -152,6 +174,26 @@ export async function planLoop(ctx: PlanContext, input: PlanLoopInput): Promise<
 
       const survived = natural.length;
       log(`planLoop: ${pass.routes.length} slingor ruttade, ${survived} naturliga`);
+
+      /**
+       * Ruttade slingor, men ingen som är en slinga. Det är ett SVAR, inte ett tomt svar.
+       *
+       * Så här ser det ut på fyra timmar hemifrån Växjö: sexton slingor ruttade, noll
+       * naturliga, den bästa med 6,8 % självöverlapp. Det är ingen bugg i planeraren — det
+       * är en sanning om småländsk sjöterräng. Vägnätet bär helt enkelt inte en så stor
+       * slinga utan att man kör samma väg två gånger.
+       *
+       * Och då ska appen säga just det. "Vi hittade ingen tur åt dig" låter som att den
+       * gav upp; det den gjorde var att vägra ljuga om vad en slinga är.
+       */
+      if (best.length === 0 && pass.routes.length > 0) {
+        const timmar = Math.round(T / 3600 * 10) / 10;
+        throw new RouteEngineError(
+          'no_route',
+          `En slinga på ${String(timmar).replace('.', ',')} timmar går inte att bygga`
+          + ' härifrån utan att köra samma väg två gånger. Prova en kortare.',
+        );
+      }
 
       return {
         routes: best,
@@ -302,7 +344,24 @@ function ringAnchors(
   const scored: (RingAnchor & { cellId: bigint })[] = [];
   let reach = 1;
 
+  // ⚠️ Wayens längd, och inte segmentets. SAMMA läxa som planAB lärde sig (anchors.ts,
+  //    MIN_ANCHOR_WAY_M) — men slingan fick den aldrig, och betalade för det:
+  //
+  //      "kastad slinga 62,7 km — u-sväng, självöverlapp 6,3 %"
+  //      "kastad slinga 45,6 km — u-sväng, självöverlapp 30,1 %"
+  //
+  //    En 60-minuters slinga gav NOLL naturliga av åtta, och sex av dem föll på u-svängar.
+  //    En `through`-punkt förbjuder u-svängen VID punkten — men ligger punkten på en 500 m
+  //    lång namnlös stump är den stumpen en vändplan, en grustäkt eller en återvändsgränd.
+  //    Man kör in, man kör ut. U-svängen är inte vid ankaret, den är ankaret.
+  const wayLengthM = new Map<number, number>();
   for (const s of segments) {
+    wayLengthM.set(s.wayId, (wayLengthM.get(s.wayId) ?? 0) + s.lengthM);
+  }
+
+  for (const s of segments) {
+    if ((wayLengthM.get(s.wayId) ?? s.lengthM) < MIN_ANCHOR_WAY_M) continue;
+
     const novelty = segmentNovelty(s, mem, today);
     if (novelty < NOVELTY_ANCHOR_MIN) continue;
 
@@ -377,8 +436,13 @@ function bestPerSector(anchors: readonly RingAnchor[]): RingAnchor[] {
  *
  * Under detta tal är A1→A2 en genväg. Över det går den lika gärna via hemmet, och slingan
  * blir en åtta som kör samma radiella väg två gånger.
+ *
+ * ⚠️ 0,85 var för snålt på den stora ringen. I småländsk sjöterräng går tvärvägen sällan
+ *    rakt — den kryper runt en sjö och kostar 90 % av vägen via hemmet, utan att för den
+ *    skull VARA vägen via hemmet. Vi släpper till 0,95 och låter självöverlappet, som mäter
+ *    saken direkt i stället för att gissa den, avgöra om slingan blev en åtta.
  */
-const SHORTCUT_MAX = 0.85;
+const SHORTCUT_MAX = 0.95;
 
 /**
  * Fyra ankarpar, 90°–150° isär sett från hemmet — OCH med en väg mellan sig.
@@ -491,12 +555,32 @@ function anglePairsOnly(anchors: readonly RingAnchor[], sectors: readonly number
   return pickSpread(candidates);
 }
 
-/** De bästa paren, med varje sektor använd högst en gång. */
+/**
+ * De bästa paren, spridda över ringen.
+ *
+ * TVÅ RUNDOR, och den andra är inte en förfining — den är skillnaden mellan att appen
+ * svarar och att den säger "vi hittade ingen tur åt dig".
+ *
+ * Första rundan är strikt: varje sektor får användas EN gång, så slingorna pekar åt olika
+ * håll och inte allihop mot samma skogsdunge. Men den strikta regeln tar slut fort — ett
+ * par äter två sektorer, vinkelvillkoret (90–150°) och tvärförbindelsen sållar hårt, och i
+ * praktiken blev det TRE par av tolv sektorer.
+ *
+ * Tre par är för tunt, för `isNatural` är ett HÅRT filter efteråt (CONTRACT §5.3) och det
+ * ska det vara: en "slinga" med 44 % självöverlapp är en tur och retur, inte en slinga, och
+ * den ska kastas. Men kastas tre av tre står användaren där med ingenting — och det gör
+ * hen regelbundet.
+ *
+ * Andra rundan fyller på upp till PAIRS och tillåter en sektor att gå igen. Slingorna blir
+ * något mindre spridda, och det är ett pris värt att betala: en något likare slinga är
+ * oändligt mycket bättre än ingen slinga. Motoranropen är gratis — vi kör vår egen Valhalla.
+ */
 function pickSpread(candidates: Pair[]): Pair[] {
   candidates.sort((a, b) => b.weight - a.weight);
 
   const used = new Set<number>();
   const out: Pair[] = [];
+  const tagna = new Set<Pair>();
 
   for (const pair of candidates) {
     if (out.length >= PAIRS) break;
@@ -504,6 +588,14 @@ function pickSpread(candidates: Pair[]): Pair[] {
 
     used.add(pair.first.sector);
     used.add(pair.second.sector);
+    tagna.add(pair);
+    out.push(pair);
+  }
+
+  // Andra rundan: fyll på. Samma sektor får gå igen, men aldrig samma PAR.
+  for (const pair of candidates) {
+    if (out.length >= PAIRS) break;
+    if (tagna.has(pair)) continue;
     out.push(pair);
   }
 

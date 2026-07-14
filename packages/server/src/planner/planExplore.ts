@@ -33,7 +33,7 @@ import {
 import type { LngLat, Route, RouteCells, SnappedPoint } from '@mindful/core';
 
 import { gravelKm, motorwayKm } from './candidates.js';
-import { ANCHOR_CLASSES, ANCHOR_SNAP, settle } from './context.js';
+import { ANCHOR_CLASSES, TARGET_SNAP, settle } from './context.js';
 import type { PlanCandidate, PlanContext, PlanResult } from './context.js';
 import { LEASH_CONTOURS_S, leashOf, timeHomeS } from './leash.js';
 
@@ -52,8 +52,17 @@ export interface PlanExploreInput {
 const LEG_MIN_M = 6_000;
 const LEG_MAX_M = 8_000;
 
-/** Tre mål, spridda över kompassnålens kon. */
-const TARGETS = 3;
+/**
+ * Målen, spridda över kompassnålens kon.
+ *
+ * ⚠️ Var 3, och gav i praktiken ETT ben — kopplet och `isNatural` sållar hårt, och de ska
+ *    göra det. Men tre mål betyder att två otursamma sållningar lämnar användaren med
+ *    ingenting, och det hände regelbundet. Fem mål mot vår egen Valhalla kostar ingenting.
+ *
+ * Konen är kvar på ±30°: bredare än så pekar "österut" inte längre österut, och nålen är
+ * det enda användaren faktiskt bad om.
+ */
+const TARGETS = 5;
 const FAN_DEG = 30;
 
 /**
@@ -94,7 +103,7 @@ export async function planExplore(
 
   // Kopplet, INNAN vi ruttar: ett mål vi ändå inte kan komma hem ifrån ska inte kosta ett
   // ruttanrop. Point-in-polygon, noll anrop, fungerar utan täckning.
-  const reachable = thrown.filter((t) => timeHomeS(leash, t) <= budget);
+  const reachable = thrown.filter((t) => timeHomeS(leash, t.at) <= budget);
   log(`planExplore: ${thrown.length} mål kastade, ${reachable.length} innanför kopplet`);
 
   if (reachable.length === 0) {
@@ -108,14 +117,26 @@ export async function planExplore(
   // Punkter som inte snappar (sjö, hygge, återvändsgränd) kastas TYST. Ett kastat mål är
   // inte ett fel — vi kastade ju tre.
 
-  const snapped = await engine.locate(reachable, ANCHOR_SNAP);
+  const snapped = await engine.locate(reachable.map((t) => t.at), TARGET_SNAP);
   calls++;
 
   const accepted = new Set<string>(ANCHOR_CLASSES);
-  const targets = snapped.filter(
-    (s: SnappedPoint | undefined): s is SnappedPoint =>
-      s !== undefined && s.ok && accepted.has(s.roadClass),
-  );
+
+  // Ett ben per riktning, och det ska vara det nyhetsrikaste som FINNS på riktigt. Punkterna
+  // är redan sorterade på nyhet, så första träffen per riktning är rätt träff.
+  const perRiktning = new Map<number, SnappedPoint>();
+  for (let i = 0; i < reachable.length; i++) {
+    const s = snapped[i];
+    const kast = reachable[i];
+    if (!s || !kast || !s.ok || !accepted.has(s.roadClass)) continue;
+    if (!perRiktning.has(kast.riktning)) perRiktning.set(kast.riktning, s);
+  }
+  const targets = [...perRiktning.values()];
+
+  // Tyst är inte samma sak som osynligt. Snappar inget mål har vi noll ben, användaren
+  // får "vi hittade ingen tur", och utan den här raden finns det ingenstans att läsa varför.
+  log(`planExplore: ${targets.length} riktningar av ${TARGETS} fick ett mål på riktig väg`
+    + ` (${reachable.length} punkter prövade)`);
 
   // ── 3. RUTTA ──────────────────────────────────── [≤3 route-anrop, PARALLELLT]
   //
@@ -178,7 +199,7 @@ export async function planExplore(
 // ─── 1. Målen ───────────────────────────────────────────────────────────────
 
 /**
- * Tre mål, 6–8 km ut i riktning φ ± 30°, viktade mot okänd mark.
+ * Målen: 6–8 km ut i riktning φ ± 30°, viktade mot okänd mark.
  *
  * Designen skriver "viktade mot H3 res-8-celler med LÅG besöksgrad". Vi frågar samma sak
  * med den FRUSNA nyhetsmatten i stället: fågelvägens nyhet från här till målet
@@ -186,41 +207,48 @@ export async function planExplore(
  * uppfattning om vad "körd väg" betyder — utan recency-decay och utan mjukt grannskap — och
  * två uppfattningar blir två siffror (CONTRACT, ingressen).
  *
- * Fågelvägen är förstås inte den väg bilen kommer att köra. Den behöver inte vara det: det
- * här är en PRIOR som avgör vilka tre mål som ens är värda ett ruttanrop. Rutten
- * poängsätts sedan på sin riktiga geometri.
+ * ── Varför ALLA avstånd, inte det bästa ─────────────────────────────────────
+ *
+ * ⚠️ Först valde vi det nyhetsrikaste avståndet per riktning och kastade de andra två.
+ *    Söder om Växjö gav det NOLL ben, varje gång. Skälet: rakt söderut ligger
+ *    Bergundasjöarna. Målet landade i vatten, snappade inte till någon väg, och det fanns
+ *    ingen reserv — vi hade redan kastat de två alternativen. Användaren fick "vi hittade
+ *    ingen tur åt dig" och det var i själva verket en sjö.
+ *
+ *    Nyhetstalet är en PRIOR, inte ett facit. Den vet ingenting om var det finns väg — det
+ *    vet bara snappningen. Alltså kastar vi alla punkter och låter snappningen sålla; först
+ *    DÄREFTER, bland dem som faktiskt existerar, får nyheten välja.
+ *
+ * Punkterna kommer sorterade: bäst nyhet först inom varje riktning. Snappningen är ett enda
+ * anrop oavsett hur många punkter vi skickar, så bredden är gratis.
  */
-function throwTargets(ctx: PlanContext, input: PlanExploreInput): LngLat[] {
+export interface Kast {
+  readonly at: LngLat;
+  /** Vilken av konens riktningar punkten hör till. Vi vill ha ett ben per riktning. */
+  readonly riktning: number;
+  readonly novelty: number;
+}
+
+function throwTargets(ctx: PlanContext, input: PlanExploreInput): Kast[] {
   const { mem, today } = ctx;
-  const out: LngLat[] = [];
+  const out: Kast[] = [];
 
   for (let i = 0; i < TARGETS; i++) {
-    // -30°, 0°, +30° runt nålen. Ingen slump: tre deterministiska riktningar är lika
-    // spridda som tre jittrade, och de går att felsöka.
     const spread = TARGETS > 1 ? (2 * i) / (TARGETS - 1) - 1 : 0;   // -1 … +1
     const heading = input.headingDeg + spread * FAN_DEG;
 
-    let best: LngLat | undefined;
-    let bestNovelty = -1;
-
-    // Tre avstånd i spannet. Det som går genom mest okänd mark vinner.
+    // Tre avstånd i spannet. ALLA tre kastas — se ovan.
     for (let k = 0; k < 3; k++) {
       const metres = LEG_MIN_M + ((LEG_MAX_M - LEG_MIN_M) * k) / 2;
       const at = project(input.from, heading, metres);
 
       const beeline = resample([input.from, at], 25);
-      const novelty = cellsNovelty(sampleCells(beeline), mem, today);
-
-      if (novelty > bestNovelty) {
-        bestNovelty = novelty;
-        best = at;
-      }
+      out.push({ at, riktning: i, novelty: cellsNovelty(sampleCells(beeline), mem, today) });
     }
-
-    if (best) out.push(best);
   }
 
-  return out;
+  // Bäst nyhet först. Sållningen nedan tar den första som snappar per riktning.
+  return out.sort((a, b) => b.novelty - a.novelty);
 }
 
 /** Punkten `metres` meter bort i bäringen `headingDeg`. Lokalt plan; felet är centimeter. */
