@@ -139,5 +139,13 @@ Koordinater är **alltid** `[lon, lat]`. Inga undantag.
 
 ---
 
-Kartdata från [OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL).
+## Licens
+
+Koden är [MIT](LICENSE).
+
+Kartdata från [OpenStreetMap](https://www.openstreetmap.org/copyright) — **ODbL**, och den
+smittar inte koden men följer med datan: bygger du en tjänst på OSM-härledd data ska du
+ange källan och dela tillbaka förbättringar av själva datan.
+
 Vektorkakel från [OpenFreeMap](https://openfreemap.org/).
+Ruttning med [Valhalla](https://github.com/valhalla/valhalla) (MIT).
