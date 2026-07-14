@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.DS_Store
+.env
+.env.local
+*.log
+
+# Privat arbetsvault — synkas aldrig till publikt repo
+vault/
+valhalla/
+
+# Diagnostikskript. Skrivna för att verifiera ETT beslut mot en riktig Valhalla och
+# sedan kastas — de säger det själva i sina headers.
+.probe/
+
+# Byggartefakter
+*.tsbuildinfo

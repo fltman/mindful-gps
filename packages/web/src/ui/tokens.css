@@ -1,0 +1,77 @@
+/*
+ * Åtta tokens. Inte fler.
+ *
+ * Varm off-white i ljust läge, djupt varmt mörkgrått i mörkt. Guld är enda accenten
+ * — finns det två accentfärger tävlar de om blicken, och appen har aldrig bråttom.
+ */
+
+:root {
+  --bakgrund: #faf7f1;
+  --yta: #ffffff;
+  --text: #26221d;
+  --text-svag: #8b8175;
+  --guld: #9a7318;
+  --linje: rgba(38, 34, 29, 0.1);
+  --radie: 18px;
+  --rytm: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bakgrund: #16130f;
+    --yta: #211d18;
+    --text: #f2ece1;
+    --text-svag: #968d81;
+    --guld: #d5a743;
+    --linje: rgba(242, 236, 225, 0.12);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bakgrund);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+
+  /* Appen körs fullskärm i en bilhållare. Inget ska gå att dra eller zooma av misstag. */
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Kartan ligger under allt och lever utanför React. Skärmarna är genomsläppliga lager
+   ovanpå den: bara det man faktiskt kan trycka på fångar fingret.
+
+   z-index är inte kosmetik: MapLibres egna kontroller ligger på z-index 2, och utan ett
+   eget lager här hade attributionsrutan kunnat lägga sig ovanpå stoppknappen. */
+.skarm {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  padding: calc(env(safe-area-inset-top) + var(--rytm) * 3)
+           calc(env(safe-area-inset-right) + var(--rytm) * 3)
+           calc(env(safe-area-inset-bottom) + var(--rytm) * 3)
+           calc(env(safe-area-inset-left) + var(--rytm) * 3);
+}
+
+.skarm > * {
+  pointer-events: auto;
+}

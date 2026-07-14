@@ -1,0 +1,20 @@
+{
+  "name": "mindfulgps",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "npm run dev:server & npm run dev:web",
+    "dev:web": "npm run dev -w @mindful/web",
+    "dev:server": "npm run dev -w @mindful/server",
+    "build": "npm run build --workspaces --if-present",
+    "check": "tsc -b packages/core packages/server packages/web",
+    "bench": "tsx bench/run.ts",
+    "valhalla": "docker start mindful-valhalla"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "tsx": "^4.19.2",
+    "@types/node": "^22.10.2"
+  }
+}

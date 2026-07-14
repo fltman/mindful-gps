@@ -1,0 +1,263 @@
+/* Komponenterna. Tokens bor i tokens.css. */
+
+/* ── Ytor över kartan ──────────────────────────────────────────────────────── */
+
+.panel {
+  background: var(--yta);
+  border: 1px solid var(--linje);
+  border-radius: var(--radie);
+  padding: calc(var(--rytm) * 3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.fyll {
+  flex: 1;
+  min-height: 0;
+  pointer-events: none;
+}
+
+/* ── Knappar ───────────────────────────────────────────────────────────────
+   Minst 64 px höga. Det här trycks på med tummen, i en bil, i rörelse. */
+
+.knapp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 64px;
+  padding: 0 calc(var(--rytm) * 3);
+  border: 1px solid transparent;
+  border-radius: var(--radie);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--bakgrund);
+  background: var(--guld);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.knapp:active {
+  transform: scale(0.985);
+}
+
+.knapp--tyst {
+  color: var(--text);
+  background: var(--yta);
+  border-color: var(--linje);
+  font-weight: 500;
+}
+
+.knapp-rad {
+  display: flex;
+  gap: calc(var(--rytm) * 1.5);
+}
+
+.knapp-rad > .knapp {
+  flex: 1;
+}
+
+/* ── Håll-in-knappen ───────────────────────────────────────────────────────
+   En stoppknapp ska kräva ett beslut. Guldet fyller knappen under en sekund;
+   släpper man tidigare rinner det tillbaka och ingenting har hänt. */
+
+.hall {
+  position: relative;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--yta);
+  border-color: var(--linje);
+}
+
+.hall__fyllning {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: var(--guld);
+  opacity: 0.22;
+  transition: transform 220ms ease-out;
+}
+
+.hall--halls .hall__fyllning {
+  transform: scaleX(1);
+  transition-duration: 1000ms;
+  transition-timing-function: linear;
+}
+
+.hall__text {
+  position: relative;
+}
+
+/* ── Tal ───────────────────────────────────────────────────────────────────
+   Är siffran stor nog behöver den ingen rubrik. */
+
+.tal {
+  font-size: clamp(56px, 17vw, 96px);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.tal--liten {
+  font-size: clamp(28px, 7vw, 40px);
+  font-weight: 400;
+  color: var(--text-svag);
+}
+
+.viskning {
+  color: var(--text-svag);
+  font-size: 16px;
+}
+
+.rubrik {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.stapel {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--rytm) * 2);
+}
+
+/* ── Under körning ─────────────────────────────────────────────────────────
+   Ingen panel, ingen kant. Talen står direkt på kartan, med en mjuk skugga
+   under sig så de går att läsa mot vad som helst. */
+
+.kor {
+  padding: calc(var(--rytm) * 2) 0 calc(var(--rytm) * 3);
+  text-shadow: 0 2px 24px var(--bakgrund), 0 1px 3px var(--bakgrund);
+}
+
+.kor .tal--liten {
+  color: var(--text);
+  opacity: 0.75;
+}
+
+/* ── Under navigering ──────────────────────────────────────────────────────
+   Nästan tomt. En pil, ett avstånd, och längst ner en rad om vad som är kvar.
+   Ingen panel, ingen ram: kartan är skärmen, texten ligger bara ovanpå den.
+
+   pointer-events: none genomgående — texten får aldrig ta fingret från kartan.
+   Bara stoppknappen (.knapp, satt av `.skarm > *`) fångar en tryckning. */
+
+.nav__topp,
+.nav__kvar {
+  pointer-events: none;
+  text-shadow: 0 2px 24px var(--bakgrund), 0 1px 3px var(--bakgrund);
+}
+
+.nav__manover {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--rytm) * 2);
+}
+
+/* Pilen är stor för att den ska läsas i ögonvrån, inte för att den är viktig. */
+.nav__pil {
+  width: clamp(72px, 22vw, 104px);
+  height: clamp(72px, 22vw, 104px);
+  flex: none;
+  color: var(--text);
+}
+
+.nav__avstand {
+  font-size: clamp(40px, 11vw, 60px);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Ett erkännande, inte en varning. Guld — samma färg som allt annat appen tycker om. */
+.nav__halsning {
+  margin: calc(var(--rytm) * 2) 0 0;
+  font-size: 18px;
+  color: var(--guld);
+  animation: trada-in 600ms ease-out both;
+}
+
+.nav__kvar {
+  margin: 0 0 calc(var(--rytm) * 2);
+  font-size: 17px;
+  color: var(--text);
+  opacity: 0.75;
+}
+
+/* Ankomsten. Störst av de två raderna, men fortfarande en viskning: den svarar på
+   "hinner jag hem till maten", inte på "hur många minuter har du kvar". */
+.nav__framme {
+  margin: 0 0 calc(var(--rytm) / 2);
+  font-size: 19px;
+  color: var(--text);
+  opacity: 0.9;
+  pointer-events: none;
+  text-shadow: 0 2px 24px var(--bakgrund), 0 1px 3px var(--bakgrund);
+}
+
+/* ── Efter körningen ───────────────────────────────────────────────────────
+   Tråden ritas in i nätet på ungefär två sekunder. Texten väntar in den. */
+
+.eftertext {
+  animation: trada-in 900ms ease-out 1900ms both;
+}
+
+.eftertext--knappar {
+  animation-delay: 2200ms;
+}
+
+@keyframes trada-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eftertext,
+  .eftertext--knappar,
+  .nav__halsning {
+    animation: none;
+  }
+  .hall--halls .hall__fyllning {
+    transition-duration: 1000ms;
+  }
+}
+
+/* ── Onboarding ────────────────────────────────────────────────────────────── */
+
+.intro {
+  overflow-y: auto;
+  padding: calc(var(--rytm) * 2) 0;
+}
+
+.intro p {
+  margin: 0 0 calc(var(--rytm) * 2);
+  max-width: 34em;
+}
+
+.intro__steg {
+  margin: 0;
+  padding: 0 0 0 1.3em;
+  color: var(--text-svag);
+}
+
+.intro__steg li {
+  margin-bottom: var(--rytm);
+}
+
+.intro b {
+  color: var(--text);
+  font-weight: 600;
+}

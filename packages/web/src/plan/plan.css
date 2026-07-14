@@ -1,0 +1,205 @@
+/*
+ * Planeringen. Samma åtta tokens som resten av appen — inga nya färger, ingen ny accent.
+ *
+ * Korten sveps horisontellt med scroll-snap och inget bibliotek: en overflow-rad med
+ * `scroll-snap-type: x mandatory` ÄR gesten, på både telefon och trackpad, och den
+ * fungerar med tangentbord och skärmläsare på köpet.
+ */
+
+/* ── Sheeten ───────────────────────────────────────────────────────────────── */
+
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--rytm) * 2);
+  max-height: 78vh;
+  overflow-y: auto;
+}
+
+.plan__rad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rytm);
+  margin: 0;
+}
+
+.plan__lagen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rytm);
+}
+
+/* ── Chips: läge och riktning ──────────────────────────────────────────────── */
+
+.chip {
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: 0 calc(var(--rytm) * 2);
+  border: 1px solid var(--linje);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text-svag);
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.chip--vald {
+  color: var(--text);
+  border-color: var(--guld);
+  box-shadow: inset 0 0 0 1px var(--guld);
+}
+
+.chip--smal {
+  flex: 1 1 0;
+  min-width: 44px;
+  padding: 0;
+}
+
+/* ── Sökfältet ─────────────────────────────────────────────────────────────── */
+
+.falt {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 calc(var(--rytm) * 2);
+  border: 1px solid var(--linje);
+  border-radius: var(--radie);
+  font: inherit;
+  font-size: 20px;
+  color: var(--text);
+  background: var(--bakgrund);
+  /* 16px+ hindrar iOS från att zooma in på fokus — en karta som hoppar när man skriver
+     är en karta man tappar bort sig i. */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.falt:focus {
+  outline: none;
+  border-color: var(--guld);
+}
+
+.traffar {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.traff {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: calc(var(--rytm) * 1.5) var(--rytm);
+  border: 0;
+  border-bottom: 1px solid var(--linje);
+  border-radius: 0;
+  font: inherit;
+  font-size: 18px;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+}
+
+.traffar li:last-child .traff {
+  border-bottom: 0;
+}
+
+/* ── Reglaget ──────────────────────────────────────────────────────────────── */
+
+.reglage {
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  accent-color: var(--guld);
+  touch-action: manipulation;
+}
+
+/* ── Korten ────────────────────────────────────────────────────────────────── */
+
+.kort-rad {
+  display: flex;
+  gap: calc(var(--rytm) * 1.5);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* Kortens skugga får inte klippas av rullningsrutan. */
+  padding: calc(var(--rytm) * 1.5) 0;
+  margin-bottom: var(--rytm);
+}
+
+.kort-rad::-webkit-scrollbar {
+  display: none;
+}
+
+.kort {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--rytm);
+  padding: calc(var(--rytm) * 2.5);
+  transition: opacity 200ms ease;
+}
+
+/* Kortet man inte tittar på tonas ned. Kartan visar ändå bara det valda. */
+.kort--vilande {
+  opacity: 0.45;
+}
+
+.kort__etikett {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-svag);
+}
+
+.kort__nyhet {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.kort__tid {
+  margin: 0;
+  font-size: 17px;
+  color: var(--text-svag);
+}
+
+.kort__not {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* ── Prickarna ─────────────────────────────────────────────────────────────── */
+
+.prickar {
+  display: flex;
+  justify-content: center;
+  gap: var(--rytm);
+  padding-bottom: calc(var(--rytm) * 2);
+}
+
+.prick {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--linje);
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.prick--vald {
+  background: var(--guld);
+}
