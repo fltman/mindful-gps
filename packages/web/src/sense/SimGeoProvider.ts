@@ -63,7 +63,10 @@ const STEP_MS = 1000;
 const DEFAULT_TICK_MS = 1000;
 
 /** Snabbare än så hinner varken kartan eller talsyntesen med, och då mäter vi dem i stället. */
-const MIN_TICK_MS = 10;
+export const MIN_TICK_MS = 10;
+
+/** Simulerad tid per fix, exporterad så farten kan uttryckas som en multipel av realtid. */
+export const SIM_STEG_MS = STEP_MS;
 
 /**
  * Simuleringen bara om `?sim=1`. Returnerar null i skarpt läge — då är det telefonens
@@ -146,10 +149,13 @@ export class SimGeoProvider implements GeoProvider {
   readonly #speedMs: number;
   readonly #noiseM: number;
   readonly #loop: boolean;
-  readonly #tickMs: number;
+  /** Väggklocka per fix. INTE readonly: ett reglage i simläge ändrar den under körning. */
+  #tickMs: number;
   readonly #rnd = lcg(0x5eed_1e55);
 
   #timer: ReturnType<typeof setInterval> | undefined;
+  /** Callbacken som tar emot fixar. Sparad så takten kan bytas utan att tappa mottagaren. */
+  #cb: ((f: Fix) => void) | undefined;
   #alongM = 0;
   /** Simulatorns egen tidsaxel. Går en simulerad sekund per fix, oavsett väggklockan. */
   #t = 0;
@@ -194,6 +200,8 @@ export class SimGeoProvider implements GeoProvider {
   start(cb: (f: Fix) => void): void {
     if (this.#timer !== undefined || this.#shape.length < 2) return;
 
+    this.#cb = cb;
+
     // En ny tur börjar vid spårets början, inte där den förra slutade. Utan den här raden
     // står andra körningen i samma flik still vid slutmålet och levererar en enda fix.
     this.#alongM = 0;
@@ -205,6 +213,14 @@ export class SimGeoProvider implements GeoProvider {
     // Första fixen direkt: en riktig telefon som redan har låst har också en position
     // att ge oss i samma ögonblick som vi börjar lyssna.
     cb(this.#sample());
+
+    this.#startaIntervall();
+  }
+
+  /** Själva tickandet. Bruten ur `start` så takten kan bytas: klipp och starta om. */
+  #startaIntervall(): void {
+    const cb = this.#cb;
+    if (cb === undefined) return;
 
     this.#timer = setInterval(() => {
       this.#t += STEP_MS;
@@ -228,6 +244,25 @@ export class SimGeoProvider implements GeoProvider {
     if (this.#timer === undefined) return;
     clearInterval(this.#timer);
     this.#timer = undefined;
+  }
+
+  /** Väggklockan per fix, just nu. Realtid = SIM_STEG_MS. */
+  get taktMs(): number {
+    return this.#tickMs;
+  }
+
+  /**
+   * Byt fart under körningen. Simulerad tid och position rör sig inte — bara hur ofta
+   * fixarna kommer i verklig tid. Ett löpande intervall klipps och startas om med den nya
+   * takten; står simulatorn still rör vi ingenting.
+   */
+  setTaktMs(ms: number): void {
+    this.#tickMs = Math.max(MIN_TICK_MS, ms);
+    if (this.#timer !== undefined) {
+      clearInterval(this.#timer);
+      this.#timer = undefined;
+      this.#startaIntervall();
+    }
   }
 
   /** Standardnormalfördelat tal, Box–Muller. */

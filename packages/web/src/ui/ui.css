@@ -327,3 +327,32 @@
   margin-top: calc(var(--rytm) * 2);
   width: 100%;
 }
+
+/* ── Fartreglaget (bara simläge) ────────────────────────────────────────────
+   Ett utvecklarverktyg. Litet, uppe till vänster, ur vägen för allt annat. */
+.simreglage {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + var(--rytm) * 2);
+  left: calc(env(safe-area-inset-left) + var(--rytm) * 2);
+  z-index: 13;
+  display: flex;
+  align-items: center;
+  gap: var(--rytm);
+  padding: calc(var(--rytm)) calc(var(--rytm) * 1.5);
+  background: var(--yta);
+  border: 1px solid var(--linje);
+  border-radius: var(--radie);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  pointer-events: auto;
+}
+.simreglage__val {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-svag);
+  min-width: 3.5em;
+  text-align: right;
+}
+.simreglage input[type='range'] {
+  width: 120px;
+  accent-color: var(--guld);
+}

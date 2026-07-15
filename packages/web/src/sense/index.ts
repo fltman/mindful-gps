@@ -23,7 +23,7 @@ import type { Polyline6 } from '@mindful/core';
 
 import { BrowserGeoProvider } from './BrowserGeoProvider.js';
 import type { GeoProvider } from './GeoProvider.js';
-import { SimGeoProvider, simOptionsFromUrl } from './SimGeoProvider.js';
+import { MIN_TICK_MS, SIM_STEG_MS, SimGeoProvider, simOptionsFromUrl } from './SimGeoProvider.js';
 
 /** Simulator om `?sim=1`, annars telefonens GPS. */
 export function createGeoProvider(onError?: (message: string) => void): GeoProvider {
@@ -49,4 +49,39 @@ export function isSimulated(): boolean {
  */
 export function simulateRoute(geo: GeoProvider, polyline6: Polyline6): void {
   if (geo instanceof SimGeoProvider) geo.setTrack(polyline6);
+}
+
+// ─── Farten i simläget ────────────────────────────────────────────────────
+//
+// Reglaget tänker i MULTIPEL av realtid (1× … MAX_SIM_FART×), inte i millisekunder mellan
+// fixar. Omvandlingen bor här, ett ställe, så komponenten aldrig behöver veta att takten
+// egentligen är en väggklocka.
+
+/** Så snabbt simulatorn får gå. SIM_STEG_MS / MIN_TICK_MS = 1000 / 10 = 100×. */
+export const MAX_SIM_FART = Math.round(SIM_STEG_MS / MIN_TICK_MS);
+
+/** Nuvarande fart som multipel av realtid, eller 1 om det inte är en simulator. */
+export function simFart(geo: GeoProvider): number {
+  return geo instanceof SimGeoProvider ? SIM_STEG_MS / geo.taktMs : 1;
+}
+
+/**
+ * Startfarten ur URL:en (`&takt=`), som multipel av realtid.
+ *
+ * Reglaget monteras innan `boot()` hunnit skapa `geo`, så det kan inte läsa farten ur en
+ * simulator som ännu inte finns. Men URL:en är känd direkt — och det är samma värde `geo`
+ * kommer att födas med. Utan den här skulle reglaget alltid visa "realtid" och ljuga om
+ * en körning som i själva verket går i 40×.
+ */
+export function simStartFart(): number {
+  const o = simOptionsFromUrl();
+  return o && o.tickMs ? SIM_STEG_MS / o.tickMs : 1;
+}
+
+/** Sätt farten som multipel av realtid. Tyst no-op i skarpt läge. */
+export function sättSimFart(geo: GeoProvider, fart: number): void {
+  if (geo instanceof SimGeoProvider) {
+    const klamrad = Math.min(MAX_SIM_FART, Math.max(1, fart));
+    geo.setTaktMs(SIM_STEG_MS / klamrad);
+  }
 }

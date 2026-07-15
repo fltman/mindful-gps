@@ -29,7 +29,7 @@ import { omrutta } from '../plan/api.js';
 import { förhandshämta } from '../ui/sevardhetBerattelse.js';
 import {
   createGeoProvider, createRecorder, idbMemory, isSimulated, releaseAwake, requestSenses,
-  simulateRoute,
+  simFart, simStartFart, sättSimFart, simulateRoute,
   type Fix, type GeoProvider, type IdbMemory, type RecordMode, type Recorder,
 } from '../sense/index.js';
 
@@ -374,6 +374,12 @@ export const useApp = create<AppState & Actions>((set, get) => ({
 
 /** Kartan, eller null innan den monterat. */
 export const kartan = (): MapHandle | null => karta;
+
+/** Simfarten just nu, som multipel av realtid. Före `geo` finns: startfarten ur URL:en. */
+export const simFartNu = (): number => (geo ? simFart(geo) : simStartFart());
+
+/** Sätt simfarten (multipel av realtid). Reglaget i simläget ropar hit. */
+export const sättSimFartNu = (fart: number): void => { if (geo) sättSimFart(geo, fart); };
 
 /** Minnet, eller null före `boot()`. */
 export const minnet = (): IdbMemory | null => motor?.minne ?? null;
