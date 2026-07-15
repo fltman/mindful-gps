@@ -7,6 +7,9 @@
  * finns för att förhindra.
  */
 
+// ⚠️ FÖRST av allt: fyll process.env ur .env innan någon modul läser en nyckel.
+import './env.js';
+
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
 

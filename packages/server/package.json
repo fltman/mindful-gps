@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc -b && mkdir -p dist/db && cp src/db/schema.sql dist/db/schema.sql",
     "start": "node dist/index.js"
   },
