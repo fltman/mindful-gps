@@ -24,6 +24,9 @@ import type { MapHandle, SevärdhetsTryck, WebThread } from '../map/index.js';
 import { memoryStats, startSync, syncOutbox } from '../memory/index.js';
 import { prepare, type NavPlan, type RerouteRequest } from '../nav/index.js';
 import { omrutta } from '../plan/api.js';
+// Direkt ur modulen, inte barrelen: den senare drar in hela ui:t (tsx-komponenter) i
+// storen, som inte är React. `sevardhetBerattelse` är ren TS.
+import { förhandshämta } from '../ui/sevardhetBerattelse.js';
 import {
   createGeoProvider, createRecorder, idbMemory, isSimulated, releaseAwake, requestSenses,
   simulateRoute,
@@ -261,6 +264,11 @@ export const useApp = create<AppState & Actions>((set, get) => ({
 
     if (motor) karta?.setRoute(rutt, motor.minne.visited, todayDay());
     set({ nav: { plan, route: rutt, mål } });
+
+    // Värm textcachen för sevärdheterna längs rutten, i bakgrunden. Nu, medan telefonen
+    // troligen har nät — så en berättelse finns på ett tryck sen, ute i täckningsskuggan.
+    // Fire-and-forget: får aldrig fördröja starten.
+    förhandshämta(rutt.geometry);
 
     // ⚠️ Ingen `await` före `starta()`: gesten som tryckte på "Kör" är den enda
     //    transienta aktivering iOS ger oss (se `starta`).

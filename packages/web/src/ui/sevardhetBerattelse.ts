@@ -29,6 +29,21 @@ export async function hämtaBerättelse(id: number, signal?: AbortSignal): Promi
 }
 
 /**
+ * Värm textcachen för sevärdheterna längs en rutt, i bakgrunden.
+ *
+ * Fire-and-forget: anropet blockerar ALDRIG starten, och ett fel är tyst — trycker man på
+ * en prick under körningen och den inte hann förberedas hämtas den live i stället. Poängen
+ * är att den oftast HANN, så att en berättelse finns på ett tryck även utan mobilnät.
+ */
+export function förhandshämta(polyline: string): void {
+  void fetch(`${API}/api/sight/prefetch`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ polyline }),
+  }).catch(() => { /* tyst — täckningsskugga är det normala, inte ett fel */ });
+}
+
+/**
  * Rösten som en spelbar url (en Blob-URL). Anroparen äger den och ska återkalla den med
  * `URL.revokeObjectURL` när den spelat klart — annars läcker minne, en mp3 i taget.
  */
