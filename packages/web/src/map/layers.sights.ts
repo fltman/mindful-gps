@@ -24,6 +24,7 @@ import { GULD, SEV_MÖRK, SEV_NATUR, SEV_SPÅR } from './palett.js';
 export const KÄLLA_SEV = 'sevärdheter';
 export const LAGER_SEV_PRICK = 'sev-prick';
 export const LAGER_SEV_NAMN = 'sev-namn';
+export const LAGER_SEV_NAMN_LATT = 'sev-namn-latt';
 export const LAGER_SEV_TRYCK = 'sev-tryck';
 
 export const KÄLLA_VALD = 'sev-vald';
@@ -84,62 +85,86 @@ function tillGeoJSON(sights: readonly Sight[]): GeoJSON.FeatureCollection<GeoJSO
   };
 }
 
+/** Ringens färg — ljus mot den ljusa kartan, mörk mot den mörka. Det som får pricken att lyfta. */
+const ringfärg = (tema: 'ljust' | 'mörkt'): string => (tema === 'mörkt' ? SEV_MÖRK : '#f7f2e7');
+
 const prickLager = (tema: 'ljust' | 'mörkt'): CircleLayerSpecification => ({
   id: LAGER_SEV_PRICK,
   type: 'circle',
   source: KÄLLA_SEV,
   minzoom: SEV_MINZOOM,
   paint: {
-    // Utsikten är större än minnesmärket. Vikten är redan svaret på "hur mycket är det
-    // värt att se det här från bilen" — den behöver ingen egen skala.
+    // Större än förr, och med en tydlig ljus ring: en färgad prick mot en grön karta
+    // försvinner, en prick med ram gör inte det. Utsikten är större än minnesmärket —
+    // vikten är redan svaret på "hur mycket är det värt att se", ingen egen skala behövs.
     'circle-radius': [
       'interpolate', ['linear'], ['zoom'],
-      SEV_MINZOOM, ['+', 1.5, ['*', 1.5, ['get', 'vikt']]],
-      15, ['+', 3.0, ['*', 3.0, ['get', 'vikt']]],
+      SEV_MINZOOM, ['+', 3, ['*', 2, ['get', 'vikt']]],
+      12, ['+', 4.5, ['*', 3, ['get', 'vikt']]],
+      16, ['+', 6, ['*', 4, ['get', 'vikt']]],
     ],
     'circle-color': ['get', 'färg'],
     // De lätta sevärdheterna tonas in först när kartan är nära nog att bära dem.
     'circle-opacity': [
       'interpolate', ['linear'], ['zoom'],
-      SEV_MINZOOM, ['case', ['>=', ['get', 'vikt'], TUNG_NOG], 0.85, 0],
-      ALLA_FRÅN_ZOOM, 0.85,
+      SEV_MINZOOM, ['case', ['>=', ['get', 'vikt'], TUNG_NOG], 0.95, 0],
+      ALLA_FRÅN_ZOOM, 0.95,
     ],
     'circle-stroke-width': [
       'interpolate', ['linear'], ['zoom'],
-      SEV_MINZOOM, ['case', ['>=', ['get', 'vikt'], TUNG_NOG], 1, 0],
-      ALLA_FRÅN_ZOOM, 1,
+      SEV_MINZOOM, ['case', ['>=', ['get', 'vikt'], TUNG_NOG], 2, 0],
+      ALLA_FRÅN_ZOOM, 2,
     ],
-    'circle-stroke-color': tema === 'mörkt' ? SEV_MÖRK : '#f7f2e7',
-    'circle-stroke-opacity': 0.9,
+    'circle-stroke-color': ringfärg(tema),
+    'circle-stroke-opacity': 1,
   },
 });
 
-const namnLager = (tema: 'ljust' | 'mörkt'): SymbolLayerSpecification => ({
-  id: LAGER_SEV_NAMN,
-  type: 'symbol',
-  source: KÄLLA_SEV,
-  // Namnen långt senare än prickarna. En prick är en antydan; ett namn är en utsaga,
-  // och den kräver plats.
-  minzoom: 13,
-  filter: ['!=', ['get', 'namn'], ''],
-  layout: {
-    'text-field': ['get', 'namn'],
-    'text-font': ['Noto Sans Italic'],
-    'text-size': 11,
-    'text-offset': [0, 0.9],
-    'text-anchor': 'top',
-    'text-max-width': 9,
-    'text-padding': 6,
-    // Trängs det: den tyngsta sevärdheten behåller sitt namn. MapLibre sorterar stigande,
-    // så vi vänder på vikten.
-    'symbol-sort-key': ['-', 1, ['get', 'vikt']],
-  },
-  paint: {
-    'text-color': ['get', 'färg'],
-    'text-halo-color': tema === 'mörkt' ? SEV_MÖRK : '#f7f2e7',
-    'text-halo-width': 1.4,
-  },
-});
+/**
+ * En namntagg BREDVID pricken. `tung` styr både vilka sevärdheter lagret ritar och hur
+ * tidigt: de tunga (utsikt, runsten, reservat …) får sitt namn redan i planeringsöversikten,
+ * de lätta först när man zoomat in så nära att kartan bär dem. Två lager i stället för ett,
+ * för ett filter kan inte bero på zoomen — och ett osynligt namn tar ändå kollisionsplats
+ * från ett synligt.
+ *
+ * Krockar två taggar vinner den tyngsta (`symbol-sort-key`), och den andra faller helt
+ * (`text-optional` spelar ingen roll utan ikon i samma lager). Så blir det aldrig gröt:
+ * tätheten begränsas av att texterna inte får överlappa.
+ */
+function namnLager(
+  id: string, tema: 'ljust' | 'mörkt', minzoom: number, tung: boolean,
+): SymbolLayerSpecification {
+  return {
+    id,
+    type: 'symbol',
+    source: KÄLLA_SEV,
+    minzoom,
+    filter: ['all',
+      ['!=', ['get', 'namn'], ''],
+      tung ? ['>=', ['get', 'vikt'], TUNG_NOG] : ['<', ['get', 'vikt'], TUNG_NOG],
+    ],
+    layout: {
+      'text-field': ['get', 'namn'],
+      'text-font': ['Noto Sans Regular'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 10, 11, 15, 13],
+      // Bredvid pricken, inte under: det läser som en tagg fäst vid markören.
+      'text-anchor': 'left',
+      'text-offset': [0.9, 0],
+      'text-justify': 'left',
+      'text-max-width': 8,
+      'text-padding': 4,
+      // Trängs det: den tyngsta sevärdheten behåller sitt namn. MapLibre sorterar stigande,
+      // så vi vänder på vikten.
+      'symbol-sort-key': ['-', 1, ['get', 'vikt']],
+    },
+    paint: {
+      'text-color': ['get', 'färg'],
+      'text-halo-color': ringfärg(tema),
+      'text-halo-width': 1.8,
+      'text-halo-blur': 0.4,
+    },
+  };
+}
 
 /**
  * Ett osynligt, större träffområde ovanpå prickarna.
@@ -163,7 +188,14 @@ export function monteraSevärdheter(map: MapLibreMap, tema: 'ljust' | 'mörkt'):
     map.addSource(KÄLLA_SEV, { type: 'geojson', data: tillGeoJSON([]) });
   }
   if (!map.getLayer(LAGER_SEV_PRICK)) map.addLayer(prickLager(tema));
-  if (!map.getLayer(LAGER_SEV_NAMN)) map.addLayer(namnLager(tema));
+  // Tunga namn redan i planeringsöversikten (samma zoom som deras prickar), lätta först
+  // när man zoomat in (zoom 13). Krockhanteringen håller översikten läsbar.
+  if (!map.getLayer(LAGER_SEV_NAMN)) {
+    map.addLayer(namnLager(LAGER_SEV_NAMN, tema, SEV_MINZOOM, true));
+  }
+  if (!map.getLayer(LAGER_SEV_NAMN_LATT)) {
+    map.addLayer(namnLager(LAGER_SEV_NAMN_LATT, tema, 13, false));
+  }
   if (!map.getLayer(LAGER_SEV_TRYCK)) map.addLayer(tryckLager());
 }
 
@@ -216,7 +248,9 @@ const ringLager = (): CircleLayerSpecification => ({
   type: 'circle',
   source: KÄLLA_VALD,
   paint: {
-    'circle-radius': 13,
+    // Bara zoom — den valda punktens feature bär ingen vikt, och ringen ska ändå bara
+    // omsluta pricken, inte tävla med den.
+    'circle-radius': ['interpolate', ['linear'], ['zoom'], SEV_MINZOOM, 9, 16, 15],
     'circle-color': 'rgba(0,0,0,0)',       // ihålig — ringen får aldrig dölja pricken
     'circle-stroke-width': 2.5,
     'circle-stroke-color': GULD,
