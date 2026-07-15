@@ -20,7 +20,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { OpenFreeMapSource, type TileSource } from './TileSource.js';
 import { debugPåslagen, monteraHex, sättHex } from './hex.debug.js';
 import { monteraRutt, sättRutt } from './layers.route.js';
-import { SEV_MINZOOM, monteraSevärdheter, sättSevärdheter } from './layers.sights.js';
+import {
+  SEV_MINZOOM, kopplaSevärdhetsTryck, monteraSevärdheter, monteraVald,
+  sättSevärdheter, sättVald, type SevärdhetsTryck,
+} from './layers.sights.js';
 import { monteraNät, sättTrådar, type WebThread } from './layers.web.js';
 import { rutnyckel, sevärdheterFör } from './sevardheter.js';
 import { LiveSpår } from './live.js';
@@ -63,6 +66,8 @@ export interface MapHandle {
   setThreads(threads: readonly WebThread[], today: number): void;
   /** Hexagonvyn. Ignoreras om `?debug=1` inte är satt. */
   setDebugMemory(mem: VisitedIndex, today: number): void;
+  /** Ring runt den tryckta sevärdheten, eller `null` för att sudda den. */
+  markeraSevärdhet(at: LngLat | null): void;
   /** Följer kartan bilen, eller har användaren pannat iväg själv? */
   setFollow(följer: boolean): void;
   /** PNG av trådarna, utan karta. Tillväxtmotorn. */
@@ -72,10 +77,12 @@ export interface MapHandle {
 export interface MapViewProps {
   readonly tema?: Tema;
   readonly source?: TileSource;
+  /** Föraren tryckte på en sevärdhet. Appen talar aldrig oombedd — det här ÄR frågan. */
+  readonly onSevärdhet?: (s: SevärdhetsTryck) => void;
 }
 
 export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView(
-  { tema = 'ljust', source = STANDARDKÄLLA },
+  { tema = 'ljust', source = STANDARDKÄLLA, onSevärdhet },
   ref,
 ) {
   const behållare = useRef<HTMLDivElement>(null);
@@ -102,6 +109,19 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView(
   /** Sevärdheterna i det utsnitt vi senast hämtade. Överlever ett stilbyte. */
   const sevärdheter = useRef<readonly Sight[]>([]);
 
+  /** Den markerade sevärdheten (ringen). Överlever ett stilbyte — se `montera`. */
+  const valdPunkt = useRef<readonly [number, number] | null>(null);
+
+  /**
+   * Trycket-på-sevärdhet-callbacken i en ref, inte i effektens beroenden.
+   *
+   * Låg den i deps hade hela kartan byggts om varje gång föräldern renderade om med en ny
+   * pilfunktion — och kartan ska byggas EN gång. Handlern binds en gång och läser alltid
+   * den färska callbacken härifrån.
+   */
+  const påSevärdhet = useRef(onSevärdhet);
+  påSevärdhet.current = onSevärdhet;
+
   useEffect(() => {
     const värd = behållare.current;
     if (!värd) return;
@@ -121,6 +141,10 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView(
     kartan.current = map;
     spår.current = new LiveSpår(map);
 
+    // Trycket binds EN gång och läser callbacken ur en ref, så den överlever ett temabyte
+    // (som river och bygger om lagren) utan att bindas om.
+    kopplaSevärdhetsTryck(map, (s) => påSevärdhet.current?.(s));
+
     // Panorerar användaren själv slutar vi följa. Att rycka tillbaka kartan under
     // fingret är den mest respektlösa saken en navigator kan göra.
     const släpp = (): void => { följer.current = false; };
@@ -133,12 +157,14 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView(
       // Sevärdheterna UNDER nätet och rutten: de är bakgrund, inte budskap. Ligger en
       // prick ovanpå den okända vägen har den tagit den plats vägen skulle haft.
       monteraSevärdheter(map, tema);
+      monteraVald(map);
       monteraRutt(map, tema);
       spår.current?.montera();
       if (debugPåslagen()) monteraHex(map);
 
       sättTrådar(map, trådar.current, dag.current);
       sättSevärdheter(map, sevärdheter.current);
+      sättVald(map, valdPunkt.current);
       const r = rutt.current;
       if (r) sättRutt(map, r.route, r.mem, r.today);
       const m = minne.current;
@@ -260,6 +286,12 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView(
       spår.current?.nollställ();
       följer.current = true;
       föregåendeFix.current = null;
+    },
+
+    markeraSevärdhet(at) {
+      valdPunkt.current = at ? [at[0], at[1]] : null;
+      const map = kartan.current;
+      if (map?.isStyleLoaded()) sättVald(map, valdPunkt.current);
     },
 
     fitBounds(pts, marginal = 48) {

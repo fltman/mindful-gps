@@ -21,6 +21,7 @@ import { memoryRoutes } from './routes/memory.js';
 import { OkartlagdRegion } from './roadindex/OkartlagdRegion.js';
 import { planRoutes } from './routes/plan.js';
 import { sightRoutes } from './routes/sights.js';
+import { AISaknasError, RöstSaknasError, sightStoryRoutes } from './routes/sightStory.js';
 import { traceRoutes } from './routes/traces.js';
 
 const PORT = Number(process.env.PORT ?? 8161);
@@ -54,6 +55,11 @@ app.setErrorHandler((err, _req, reply) => {
   // men det är inte hens fel och det är inte trasigt.
   if (err instanceof OkartlagdRegion) {
     app.log.warn(`okartlagd region: ${err.saknade} hämtningsrutor saknas`);
+    return reply.code(501).send({ error: err.message });
+  }
+  // AI-berättelser och uppläsning är TILLVAL. Saknas nyckeln är det inte trasigt — det är
+  // inte påslaget, och klienten ska få höra just det och inget rött.
+  if (err instanceof AISaknasError || err instanceof RöstSaknasError) {
     return reply.code(501).send({ error: err.message });
   }
   if (err instanceof RouteEngineError) {
@@ -90,6 +96,7 @@ await app.register(traceRoutes, { prefix: '/api' });
 await app.register(memoryRoutes, { prefix: '/api' });
 await app.register(planRoutes, { prefix: '/api', deps: { engine, roads } });
 await app.register(sightRoutes, { prefix: '/api', deps: { pool } });
+await app.register(async (a) => { sightStoryRoutes(a, { deps: { pool } }); }, { prefix: '/api' });
 
 await app.listen({ port: PORT, host: '0.0.0.0' });
 

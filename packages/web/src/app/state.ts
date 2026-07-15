@@ -20,7 +20,7 @@ import {
 } from '@mindful/core';
 import { create } from 'zustand';
 
-import type { MapHandle, WebThread } from '../map/index.js';
+import type { MapHandle, SevärdhetsTryck, WebThread } from '../map/index.js';
 import { memoryStats, startSync, syncOutbox } from '../memory/index.js';
 import { prepare, type NavPlan, type RerouteRequest } from '../nav/index.js';
 import { omrutta } from '../plan/api.js';
@@ -60,6 +60,8 @@ export interface AppState {
   readonly gapCount: number;
   /** Rutten vi följer, eller null i fri körning. Byts ut vid omruttning. */
   readonly nav: NavUppdrag | null;
+  /** Sevärdheten föraren tryckte på, eller null. Öppnar berättelsebladet. */
+  readonly valdSevärdhet: SevärdhetsTryck | null;
   /** Svensk, färdig mening. Aldrig en felkod. */
   readonly error: string | null;
 }
@@ -83,6 +85,9 @@ export interface Actions {
   omrutt(req: RerouteRequest): Promise<void>;
   /** `true` = vi kom fram. `false` = föraren avslutade själv. */
   avslutaNav(framme: boolean): Promise<void>;
+  /** Föraren tryckte på en sevärdhet. Öppnar bladet — appen talar aldrig oombett. */
+  visaSevärdhet(s: SevärdhetsTryck): void;
+  stängSevärdhet(): void;
 }
 
 interface Motor {
@@ -149,6 +154,7 @@ export const useApp = create<AppState & Actions>((set, get) => ({
   netKm: 0,
   gapCount: 0,
   nav: null,
+  valdSevärdhet: null,
   error: null,
 
   async boot(): Promise<void> {
@@ -211,6 +217,16 @@ export const useApp = create<AppState & Actions>((set, get) => ({
     karta = handtag;
     // Kartan kan monteras före ELLER efter boot(). Den som kommer sist målar.
     målaOm();
+  },
+
+  visaSevärdhet(s): void {
+    karta?.markeraSevärdhet(s.at);
+    set({ valdSevärdhet: s });
+  },
+
+  stängSevärdhet(): void {
+    karta?.markeraSevärdhet(null);
+    set({ valdSevärdhet: null });
   },
 
   godkännIntro(): void {

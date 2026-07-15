@@ -19,7 +19,7 @@ import { MapView, type MapHandle, type Tema } from '../map/index.js';
 import { NavScreen } from '../nav/index.js';
 import { PlanFlow } from '../plan/index.js';
 import {
-  AfterDriveScreen, HomeScreen, Onboarding, RecordingScreen,
+  AfterDriveScreen, HomeScreen, Onboarding, RecordingScreen, SevardhetsBlad,
 } from '../ui/index.js';
 
 import { kartan, minnet, recordern, useApp } from './state.js';
@@ -38,6 +38,7 @@ const TEMA: Tema = window.matchMedia('(prefers-color-scheme: dark)').matches
 export function Router() {
   const handtag = useRef<MapHandle>(null);
   const registreraKarta = useApp((s) => s.registreraKarta);
+  const visaSevärdhet = useApp((s) => s.visaSevärdhet);
 
   useEffect(() => {
     registreraKarta(handtag.current);
@@ -46,10 +47,32 @@ export function Router() {
 
   return (
     <>
-      <MapView ref={handtag} tema={TEMA} />
+      <MapView ref={handtag} tema={TEMA} onSevärdhet={visaSevärdhet} />
       <Skärmar />
+      <Blad />
       <Felrad />
     </>
+  );
+}
+
+/**
+ * Berättelsebladet, utanför vy-växeln.
+ *
+ * Det ligger inte i en `Vy` för att en sevärdhet kan tryckas i vilket läge som helst —
+ * kartan är ju alltid under skärmarna. Egen komponent så att den ström av siffror som rör
+ * sig under en tur aldrig ritar om bladet, och tvärtom.
+ */
+function Blad() {
+  const valdSevärdhet = useApp((s) => s.valdSevärdhet);
+  const stängSevärdhet = useApp((s) => s.stängSevärdhet);
+  if (!valdSevärdhet) return null;
+
+  return (
+    <SevardhetsBlad
+      key={valdSevärdhet.id}
+      sevärdhet={valdSevärdhet}
+      onStäng={stängSevärdhet}
+    />
   );
 }
 

@@ -6,6 +6,7 @@
  */
 
 export { MapView, type MapHandle, type MapViewProps } from './MapView.js';
+export { type SevärdhetsTryck } from './layers.sights.js';
 export { type WebThread, trådLjus } from './layers.web.js';
 export { delaBild, type DelaInställningar } from './share.js';
 export { BOTTEN, buildStyle, type Tema } from './style.js';

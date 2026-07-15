@@ -261,3 +261,69 @@
   color: var(--text);
   font-weight: 600;
 }
+
+/* ── Sevärdhetsbladet ──────────────────────────────────────────────────────
+   Ett kort uppe till HÖGER, inte en bottensheet: en slinga eller en rutt ritas
+   nedåt på kartan, och bladet får inte täcka den man just tittar på. Kortet
+   fångar fingret; resten av kartan är fri att panorera. */
+.blad-kort {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + var(--rytm) * 2);
+  right: calc(env(safe-area-inset-right) + var(--rytm) * 2);
+  width: min(380px, calc(100vw - var(--rytm) * 4));
+  max-height: min(72vh, calc(100vh - var(--rytm) * 8));
+  overflow-y: auto;
+  z-index: 12;
+  pointer-events: auto;
+  animation: blad-in 220ms ease-out both;
+}
+
+@keyframes blad-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blad-kort { animation: none; }
+}
+
+.blad__topp {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rytm);
+}
+.blad__namn {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+}
+.blad__stang {
+  flex: none;
+  border: none;
+  background: none;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--text);
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.blad__text {
+  margin: calc(var(--rytm) * 1.5) 0 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.blad__kallor {
+  margin-top: calc(var(--rytm) * 1.5);
+}
+.blad__kallor a {
+  color: inherit;
+  text-decoration: underline;
+}
+.blad__lyssna {
+  margin-top: calc(var(--rytm) * 2);
+  width: 100%;
+}

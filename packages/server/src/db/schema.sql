@@ -126,3 +126,19 @@ CREATE TABLE IF NOT EXISTS sight (
 
 CREATE INDEX IF NOT EXISTS sight_tile_idx ON sight (tile_h3_6);
 CREATE INDEX IF NOT EXISTS sight_at_idx ON sight USING GIST (at);
+
+-- ── Berättelser ────────────────────────────────────────────────────────────
+-- En AI-skriven text om en sevärdhet, och dess uppläsning. Komponeras EN gång per
+-- sevärdhet och återanvänds för alltid: andra personen som trycker på Kosta glasbruk får
+-- samma text direkt och gratis. Ett anrop till en betald modell per plats i hela Sverige,
+-- inte per tryck.
+--
+-- `ljud` fylls först när någon faktiskt bett om uppläsning — de flesta läser texten och
+-- kör vidare, och ElevenLabs är det dyra steget.
+CREATE TABLE IF NOT EXISTS sight_story (
+  sight_id   bigint PRIMARY KEY REFERENCES sight(id) ON DELETE CASCADE,
+  text       text NOT NULL,
+  sources    jsonb NOT NULL DEFAULT '[]'::jsonb,
+  audio      bytea,                                   -- mp3, null tills uppläst första gången
+  created_at timestamptz NOT NULL DEFAULT now()
+);
